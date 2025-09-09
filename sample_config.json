@@ -5,8 +5,7 @@
     "Exiftool": false,
     "Detect-it-Easy": false,
     "Floss": false,
-    "ResourceExtract": false,
-    "Binwalk": false
+    "ResourceExtract": false
   },
   "dynamic_tools": {
     "Fakenet": false,
@@ -25,11 +24,11 @@
   "binary": {
     "path": "",
     "run": false,
-    "as_admin": false,
+    "as_admin": true,
     "bin_pass": ""
   },
   "vm": {
-    "username": "test",
-    "password": "asdasd"
+    "username": "tester",
+    "password": "password"
   }
 }

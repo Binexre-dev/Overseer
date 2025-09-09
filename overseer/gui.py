@@ -129,8 +129,8 @@ class overseerUI(QWidget):
 
     def toggle_vm_fields(self):
         enabled = self.admin_check.isChecked()
-        self.vm_username.setEnabled(enabled)
-        self.vm_password.setEnabled(enabled)
+        self.username.setEnabled(enabled)
+        self.password.setEnabled(enabled)
 
     def preconfigure_from_config(self):
         if not isinstance(self.config_data, dict):
@@ -334,11 +334,12 @@ class overseerUI(QWidget):
                 "binary": {
                     "path": self.binary_path.text(),
                     "run": self.run_check.isChecked(),
-                    "as_admin": self.admin_check.isChecked()
+                    "as_admin": self.admin_check.isChecked(),
+                    "bin_pass": self.zip_password.text()
                 }
             }
 
-            if self.vm.text():
+            if self.username.text() or self.password.text():
                 analysis_config["vm"] = {
                     "username": self.username.text(),
                     "password": self.password.text()
@@ -374,40 +375,28 @@ class overseerUI(QWidget):
                 config = {}
 
             # Update static_tools
-            if 'static_tools' not in config:
-                config['static_tools'] = {}
-            for name, cb in self.static_tools.items():
-                config['static_tools'][name] = cb.isChecked()
-
+            config['static_tools'] = {name: cb.isChecked() for name, cb in self.static_tools.items()}
             # Update dynamic_tools
-            if 'dynamic_tools' not in config:
-                config['dynamic_tools'] = {}
-            for name, cb in self.dynamic_tools.items():
-                config['dynamic_tools'][name] = cb.isChecked()
-
+            config['dynamic_tools'] = {name: cb.isChecked() for name, cb in self.dynamic_tools.items()}
             # Update procmon_settings
-            if 'procmon_settings' not in config:
-                config['procmon_settings'] = {}
-            config['procmon_settings']['enabled'] = self.dynamic_tools["Procmon"].isChecked()
-            config['procmon_settings']['disable_timer'] = self.procmon_disable_timer.isChecked()
-            config['procmon_settings']['duration'] = self.procmon_duration.text()
-
+            config['procmon_settings'] = {
+                'enabled': self.dynamic_tools["Procmon"].isChecked(),
+                'disable_timer': self.procmon_disable_timer.isChecked(),
+                'duration': self.procmon_duration.text()
+            }
             # Update binary section
-            if 'binary' not in config:
-                config['binary'] = {}
-            config['binary']['path'] = self.binary_path.text()
-            config['binary']['run'] = self.run_check.isChecked()
-            config['binary']['as_admin'] = self.admin_check.isChecked()
-
+            config['binary'] = {
+                'path': self.binary_path.text(),
+                'run': self.run_check.isChecked(),
+                'as_admin': self.admin_check.isChecked(),
+                'bin_pass': self.zip_password.text()
+            }
             # Update VM section if any VM field is filled
-            if  self.username.text() or self.password.text():
-                if 'vm' not in config:
-                    config['vm'] = {}
-                config['vm']['username'] = self.username.text()
-                config['vm']['password'] = self.password.text()
-                config['vm']['binary_password'] = self.zip_password.text()
-  
-
+            if self.username.text() or self.password.text():
+                config['vm'] = {
+                    'username': self.username.text(),
+                    'password': self.password.text()
+                }
             # Save config
             with open(self.config_path, 'w') as f:
                 json.dump(config, f, indent=2)
@@ -421,33 +410,26 @@ class overseerUI(QWidget):
         try:
             with open(self.config_path, 'r') as f:
                 config = json.load(f)
-                
-
-            # Load run settings
-            self.run_check.setChecked(config.get("run", False))
-            self.admin_check.setChecked(config.get("as_admin", False))
-            
-            # Load Procmon settings
-            self.dynamic_tools["Procmon"].setChecked(config.get("procmon_enabled", False))
-            self.procmon_disable_timer.setChecked(config.get("procmon_disable_timer", False))
-            self.procmon_duration.setText(config.get("procmon_duration", "60"))
-            
+            # Load binary settings
+            binary = config.get('binary', {})
+            self.run_check.setChecked(binary.get("run", False))
+            self.admin_check.setChecked(binary.get("as_admin", False))
+            self.zip_password.setText(binary.get("bin_pass", ""))
+            self.binary_path.setText(binary.get("path", ""))
+            # Load VM settings
+            vm = config.get('vm', {})
+            self.username.setText(vm.get("username", ""))
+            self.password.setText(vm.get("password", ""))
+            # Load procmon settings
+            procmon = config.get('procmon_settings', {})
+            self.dynamic_tools["Procmon"].setChecked(procmon.get("enabled", False))
+            self.procmon_disable_timer.setChecked(procmon.get("disable_timer", False))
+            self.procmon_duration.setText(procmon.get("duration", "60"))
             # Load static tools
-            self.static_tools["Capa"].setChecked(config.get("tool_Capa", False))
-            self.static_tools["Floss"].setChecked(config.get("tool_Floss", False))
-            self.static_tools["Yara"].setChecked(config.get("tool_Yara", False))
-            self.static_tools["Detect-it-Easy"].setChecked(config.get("tool_Detect-It-Easy", False))
-            self.static_tools["ResourceExtract"].setChecked(config.get("tool_ResourceExtract", False))
-            self.static_tools["Exiftool"].setChecked(config.get("tool_Exiftool", False))
-            self.static_tools["Binwalk"].setChecked(config.get("tool_Binwalk", False))
-            
+            for name, cb in self.static_tools.items():
+                cb.setChecked(config.get('static_tools', {}).get(name, False))
             # Load dynamic tools
-            self.dynamic_tools["Fakenet"].setChecked(config.get("tool_FakeNet", False))
-            self.dynamic_tools["ProcDump"].setChecked(config.get("tool_ProcDump", False))
-            self.dynamic_tools["Autoclicker"].setChecked(config.get("tool_Autoclicker", False))
-            self.dynamic_tools["CaptureFiles"].setChecked(config.get("tool_Capture_Dropped_Files", False))
-            self.dynamic_tools["RandomizeNames"].setChecked(config.get("randomize_names", False))
-            self.dynamic_tools["Screenshots"].setChecked(config.get("tool_Screenshots", False))
-            
+            for name, cb in self.dynamic_tools.items():
+                cb.setChecked(config.get('dynamic_tools', {}).get(name, False))
         except Exception as e:
             self.show_message("Error", f"Failed to load preferences: {str(e)}", QMessageBox.Icon.Warning)
