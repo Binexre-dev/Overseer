@@ -1,1 +1,7 @@
-Add TTD.exe in Dynamic section
+- Add TTD.exe in Dynamic section.
+- Actively track parent and child processes to kill them off if selected in menu.
+- Actively track if saved files have been modified
+- Build dropped file binary capture tool
+- Build screen capture tool when a popup appears
+- Build in name randomization for tools to hide from binary
+- Build Windows driver version to enable analysis of rootkits and privelege escalation malware
