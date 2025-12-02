@@ -1,3 +1,4 @@
+- Add ability to give specific arguements when running a binary
 - Add TTD.exe in Dynamic section.
 - Actively track parent and child processes to kill them off if selected in menu.
 - Actively track if saved files have been modified
