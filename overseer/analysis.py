@@ -1,8 +1,58 @@
 import os
 import json
+import subprocess
+from utils import *
 from pathlib import Path
 from typing import Optional, Callable, Dict, Any, Union
 # from main import ToolConfig  # Uncomment if you use ToolConfig in this file
+
+#Static Tools
+def launch_capa():
+    pass
+
+def launch_yara():
+    pass
+
+def launch_exiftool():
+    pass
+
+def launch_die():
+    pass
+
+def launch_floss():
+    pass
+
+def launch_resourceextract():
+    pass
+
+def launch_Binwalk():
+    pass
+
+
+#Dynamic Tools
+def launch_procmon(procmonexe, pml_file, use_pmc=False, pmc_file=None):
+    cmdline = '"{}" /BackingFile "{}" /Quiet /Minimized'.format(procmonexe, pml_file)
+    if use_pmc and file_exists(pmc_file):
+        cmdline += ' /LoadConfig "{}"'.format(pmc_file)
+    subprocess.Popen(cmdline)
+
+def launch_procdump():
+    pass
+
+def launch_autoclicker():
+    pass
+
+def launch_capturefiles():
+    pass
+
+def launch_screenshots():
+    pass
+
+def launch_randomizenames():
+    pass
+
+def launch_ttd():
+    pass
 
 
 def start_analysis_from_config(

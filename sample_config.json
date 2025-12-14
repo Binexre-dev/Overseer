@@ -1,11 +1,12 @@
 {
   "static_tools": {
-    "Capa": false,
-    "Yara": false,
-    "Exiftool": false,
-    "Detect-it-Easy": false,
-    "Floss": false,
-    "ResourceExtract": false
+    "Capa": true,
+    "Yara": true,
+    "Exiftool": true,
+    "Detect-it-Easy": true,
+    "Floss": true,
+    "ResourceExtract": true,
+    "Binwalk": true
   },
   "dynamic_tools": {
     "Fakenet": false,
@@ -14,6 +15,7 @@
     "CaptureFiles": false,
     "Screenshots": false,
     "RandomizeNames": false,
+    "TTD": false,
     "Procmon": false
   },
   "procmon_settings": {
@@ -24,7 +26,7 @@
   "binary": {
     "path": "",
     "run": false,
-    "as_admin": true,
+    "as_admin": false,
     "bin_pass": ""
   },
   "vm": {

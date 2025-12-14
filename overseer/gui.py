@@ -31,7 +31,7 @@ class overseerUI(QWidget):
 
     def init_ui(self):
         self.setWindowTitle("Overseer")
-        self.setMinimumSize(450, 500)
+        self.setMinimumSize(425, 550)
         
         # Set window icon using absolute path
         icon_path = Path(__file__).parent.parent / "Images" / "kimdosi_icon.ico"
@@ -78,19 +78,29 @@ class overseerUI(QWidget):
         form.setSpacing(6)
         form.setContentsMargins(5, 5, 5, 5)
 
-        # File selection row
+        # File selection row with embedded browse button
         binary_widget = QWidget()
         binary_layout = QHBoxLayout(binary_widget)
         binary_layout.setContentsMargins(0, 0, 0, 0)
+        binary_layout.setSpacing(0)
+        
         self.binary_path = QLineEdit()
         self.binary_path.setReadOnly(True)
-        browse_btn = QPushButton("Browse")
+        self.binary_path.setMinimumWidth(235)
+        self.binary_path.setPlaceholderText("Select a file...")
+        
+        browse_btn = QPushButton("📁")
+        browse_btn.setToolTip("Browse for file")
         browse_btn.clicked.connect(self.browse_malware)
+        browse_btn.setMaximumWidth(30)
+        browse_btn.setStyleSheet("QPushButton { border-left: none; }")
+        
         binary_layout.addWidget(self.binary_path)
         binary_layout.addWidget(browse_btn)
 
         # Password field
         self.zip_password = QLineEdit()
+        self.zip_password.setMinimumWidth(235)
         self.zip_password.setPlaceholderText("Zip Password (if any)")
 
         # Run and Admin checkboxes in a horizontal layout
@@ -113,8 +123,10 @@ class overseerUI(QWidget):
         vm_type_layout.setContentsMargins(0, 0, 0, 0)
 
         self.username = QLineEdit()
+        self.username.setMinimumWidth(235)
         self.username.setPlaceholderText("VM Username")
         self.password = QLineEdit()
+        self.password.setMinimumWidth(235)
         self.password.setPlaceholderText("VM Password")
         self.password.setEchoMode(QLineEdit.EchoMode.Password)
 
@@ -204,11 +216,24 @@ class overseerUI(QWidget):
             "Exiftool": QCheckBox("Exiftool"),
             "Detect-it-Easy": QCheckBox("Detect It Easy"),
             "Floss": QCheckBox("FLOSS"),
-            "ResourceExtract": QCheckBox("Resource Extract")
+            "ResourceExtract": QCheckBox("Resource Extract"),
+            "Binwalk": QCheckBox("Binwalk")
         }
         
-        for tool in self.static_tools.values():
-            static_layout.addWidget(tool)
+        # Create 2-column grid for static tools
+        from PyQt6.QtWidgets import QGridLayout
+        static_grid = QWidget()
+        static_grid_layout = QGridLayout(static_grid)
+        static_grid_layout.setContentsMargins(0, 0, 0, 0)
+        static_grid_layout.setSpacing(4)
+        
+        static_tool_list = list(self.static_tools.values())
+        for i, tool in enumerate(static_tool_list):
+            row = i // 2
+            col = i % 2
+            static_grid_layout.addWidget(tool, row, col)
+        
+        static_layout.addWidget(static_grid)
 
         layout.addWidget(static_frame, 1)  # 1 stretch factor
         layout.addItem(QSpacerItem(0, 10, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed))
@@ -242,7 +267,8 @@ class overseerUI(QWidget):
             "Autoclicker": QCheckBox("Auto Clicker"),
             "CaptureFiles": QCheckBox("Capture Dropped Files"),
             "Screenshots": QCheckBox("Take Screenshots"),
-            "RandomizeNames": QCheckBox("Randomize File Names")
+            "RandomizeNames": QCheckBox("Randomize File Names"),
+            "TTD": QCheckBox("Time Travel Debugging")
         }
         
         # Procmon with inline settings
@@ -276,10 +302,29 @@ class overseerUI(QWidget):
         
         dynamic_layout.addWidget(procmon_widget)
         
-        # Add remaining dynamic tools
-        for tool in self.dynamic_tools.values():
-            if tool != self.dynamic_tools["Procmon"]:  # Skip Procmon as it's already added
-                dynamic_layout.addWidget(tool)
+        # Make TTD and Procmon mutually exclusive
+        self.dynamic_tools["Procmon"].stateChanged.connect(
+            lambda state: self.handle_procmon_ttd_exclusion(state, "Procmon")
+        )
+        self.dynamic_tools["TTD"].stateChanged.connect(
+            lambda state: self.handle_procmon_ttd_exclusion(state, "TTD")
+        )
+        
+        # Create 2-column grid for remaining dynamic tools
+        from PyQt6.QtWidgets import QGridLayout
+        dynamic_grid = QWidget()
+        dynamic_grid_layout = QGridLayout(dynamic_grid)
+        dynamic_grid_layout.setContentsMargins(0, 0, 0, 0)
+        dynamic_grid_layout.setSpacing(4)
+        
+        # Get tools excluding Procmon
+        dynamic_tool_list = [tool for name, tool in self.dynamic_tools.items() if name != "Procmon"]
+        for i, tool in enumerate(dynamic_tool_list):
+            row = i // 2
+            col = i % 2
+            dynamic_grid_layout.addWidget(tool, row, col)
+        
+        dynamic_layout.addWidget(dynamic_grid)
 
         layout.addWidget(dynamic_frame, 1)  # 1 stretch factor
         layout.addItem(QSpacerItem(0, 10, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed))
@@ -292,6 +337,13 @@ class overseerUI(QWidget):
         for tool in tool_dict.values():
             tool.setChecked(state == 2)  # 2 represents Qt.Checked
 
+    def handle_procmon_ttd_exclusion(self, state, source):
+        """Ensure Procmon and TTD cannot be enabled at the same time"""
+        if state == 2:  # Qt.Checked
+            if source == "Procmon":
+                self.dynamic_tools["TTD"].setChecked(False)
+            elif source == "TTD":
+                self.dynamic_tools["Procmon"].setChecked(False)
 
     def browse_malware(self):
         file_path, _ = QFileDialog.getOpenFileName(
