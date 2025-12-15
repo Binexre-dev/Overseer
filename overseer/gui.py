@@ -4,11 +4,44 @@ from PyQt6.QtWidgets import (
     QFormLayout, QFileDialog, QMessageBox, QSizePolicy, QRadioButton,
     QFrame, QSpacerItem
 )
-from PyQt6.QtGui import QIcon, QPalette, QBrush, QPixmap
-from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QIcon, QPalette, QBrush, QPixmap, QMouseEvent
+from PyQt6.QtCore import Qt, pyqtSignal
 from pathlib import Path
 import json
 import os
+from overseer.utils import discover_all_tools, find_tool
+
+
+class ClickableCheckBox(QCheckBox):
+    """Custom QCheckBox that emits a signal when clicked while disabled"""
+    disabledClicked = pyqtSignal(str, str)  # tool_name, util_name
+    
+    def __init__(self, text, tool_name="", util_name=""):
+        super().__init__(text)
+        self.tool_name = tool_name
+        self.util_name = util_name
+        self.is_tool_disabled = False
+    
+    def mousePressEvent(self, event: QMouseEvent):
+        if self.is_tool_disabled and self.tool_name and self.util_name:
+            self.disabledClicked.emit(self.tool_name, self.util_name)
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+    
+    def setToolDisabled(self, disabled: bool):
+        """Mark this tool as disabled (not found) but keep it clickable"""
+        self.is_tool_disabled = disabled
+        if disabled:
+            # Keep enabled for mouse events but style as disabled
+            self.setEnabled(True)
+            self.setCheckable(False)
+            self.setStyleSheet("QCheckBox { color: gray; }")
+        else:
+            self.setEnabled(True)
+            self.setCheckable(True)
+            self.setStyleSheet("")
+
 
 class overseerUI(QWidget):
     def __init__(self, config_path=None):
@@ -21,8 +54,13 @@ class overseerUI(QWidget):
                     self.config_data = json.load(f)
             except Exception:
                 self.config_data = None
+        
+        # Discover available tools
+        self.available_tools = discover_all_tools()
+        
         self.init_ui()
         self.load_preferences()
+        self.update_tool_availability()
 
     def closeEvent(self, event):
         """Save preferences when window is closed"""
@@ -211,13 +249,13 @@ class overseerUI(QWidget):
         
         self.static_all.stateChanged.connect(lambda state: self.toggle_all_tools(state, self.static_tools))
         self.static_tools = {
-            "Capa": QCheckBox("Capa"),
-            "Yara": QCheckBox("Yara"), 
-            "Exiftool": QCheckBox("Exiftool"),
-            "Detect-it-Easy": QCheckBox("Detect It Easy"),
-            "Floss": QCheckBox("FLOSS"),
-            "ResourceExtract": QCheckBox("Resource Extract"),
-            "Binwalk": QCheckBox("Binwalk")
+            "Capa": ClickableCheckBox("Capa", "Capa", "capa"),
+            "Yara": ClickableCheckBox("Yara", "Yara", "yara"), 
+            "Exiftool": ClickableCheckBox("Exiftool", "Exiftool", "exiftool"),
+            "Detect-it-Easy": ClickableCheckBox("Detect It Easy", "Detect-it-Easy", "die"),
+            "Floss": ClickableCheckBox("FLOSS", "Floss", "floss"),
+            "ResourceExtract": ClickableCheckBox("Resource Extract", "ResourceExtract", "resourcehacker"),
+            "Binwalk": ClickableCheckBox("Binwalk", "Binwalk", "binwalk")
         }
         
         # Create 2-column grid for static tools
@@ -262,13 +300,13 @@ class overseerUI(QWidget):
         
         # Create a dict without Procmon as it will be handled separately
         self.dynamic_tools = {
-            "Fakenet": QCheckBox("FakeNet-NG"),
-            "ProcDump": QCheckBox("ProcDump"),
+            "Fakenet": ClickableCheckBox("FakeNet-NG", "Fakenet", "fakenet"),
+            "ProcDump": ClickableCheckBox("ProcDump", "ProcDump", "procdump"),
             "Autoclicker": QCheckBox("Auto Clicker"),
             "CaptureFiles": QCheckBox("Capture Dropped Files"),
             "Screenshots": QCheckBox("Take Screenshots"),
             "RandomizeNames": QCheckBox("Randomize File Names"),
-            "TTD": QCheckBox("Time Travel Debugging")
+            "TTD": ClickableCheckBox("Time Travel Debugging", "TTD", "ttd")
         }
         
         # Procmon with inline settings
@@ -277,7 +315,7 @@ class overseerUI(QWidget):
         procmon_layout.setContentsMargins(0, 0, 0, 0)
         procmon_layout.setSpacing(10)
         
-        self.dynamic_tools["Procmon"] = QCheckBox("Process Monitor")
+        self.dynamic_tools["Procmon"] = ClickableCheckBox("Process Monitor", "Procmon", "procmon")
         procmon_layout.addWidget(self.dynamic_tools["Procmon"])
         
         duration_widget = QWidget()
@@ -333,9 +371,147 @@ class overseerUI(QWidget):
         group.setLayout(layout)
         return group
 
+    def get_tool_descriptions(self) -> dict:
+        """Get descriptions for all analysis tools"""
+        return {
+            "Capa": "Detects capabilities in executable files (API calls, strings, etc.)",
+            "Yara": "Pattern matching tool for identifying and classifying malware samples",
+            "Exiftool": "Reads and writes metadata information in files",
+            "Detect-it-Easy": "Detects file types, packers, compilers, and protectors",
+            "Floss": "Automatically extracts obfuscated strings from malware",
+            "ResourceExtract": "Extracts resources (icons, dialogs, strings) from executables",
+            "Binwalk": "Analyzes and extracts firmware images and embedded files",
+            "Fakenet": "Network simulation tool for dynamic malware analysis",
+            "ProcDump": "Creates crash dumps of processes for analysis",
+            "Procmon": "Advanced monitoring tool showing real-time file system and registry activity",
+            "TTD": "Time Travel Debugging - Records program execution for analysis",
+            "Autoclicker": "Automatically clicks windows and dialogs during analysis",
+            "CaptureFiles": "Captures files created or modified during execution",
+            "Screenshots": "Takes periodic screenshots during analysis",
+            "RandomizeNames": "Randomizes file and directory names to evade detection",
+        }
+    
+    def update_tool_availability(self):
+        """Disable tools that are not found and update their labels"""
+        # Map GUI tool names to utils tool names
+        tool_mapping = {
+            "Capa": "capa",
+            "Yara": "yara",
+            "Exiftool": "exiftool",
+            "Detect-it-Easy": "die",
+            "Floss": "floss",
+            "ResourceExtract": "resourcehacker",
+            "Binwalk": "binwalk",
+            "Fakenet": "fakenet",
+            "ProcDump": "procdump",
+            "Procmon": "procmon",
+            "TTD": "ttd",
+            "Autoclicker": None,  # Not a discovered tool
+            "CaptureFiles": None,
+            "Screenshots": None,
+            "RandomizeNames": None,
+        }
+        
+        tool_descriptions = self.get_tool_descriptions()
+        
+        # Check static tools
+        for tool_name, checkbox in self.static_tools.items():
+            util_name = tool_mapping.get(tool_name)
+            description = tool_descriptions.get(tool_name, "")
+            
+            if util_name and not self.available_tools.get(util_name):
+                # Tool not found - disable and add click handler
+                if isinstance(checkbox, ClickableCheckBox):
+                    checkbox.setToolDisabled(True)
+                    checkbox.disabledClicked.connect(self.locate_tool)
+                else:
+                    checkbox.setEnabled(False)
+                checkbox.setChecked(False)
+                checkbox.setToolTip(f"{tool_name} not found. Click to locate executable.")
+                checkbox.setCursor(Qt.CursorShape.PointingHandCursor)
+                # Update label to show unavailable
+                current_text = checkbox.text()
+                if "(Not Found)" not in current_text:
+                    checkbox.setText(f"{current_text} (Not Found)")
+            else:
+                # Tool found - add description tooltip
+                if description:
+                    path_info = f"\nLocation: {self.available_tools.get(util_name)}" if util_name and self.available_tools.get(util_name) else ""
+                    checkbox.setToolTip(f"{description}{path_info}")
+        
+        # Check dynamic tools
+        for tool_name, checkbox in self.dynamic_tools.items():
+            util_name = tool_mapping.get(tool_name)
+            description = tool_descriptions.get(tool_name, "")
+            
+            if util_name and not self.available_tools.get(util_name):
+                # Tool not found - disable and add click handler
+                if isinstance(checkbox, ClickableCheckBox):
+                    checkbox.setToolDisabled(True)
+                    checkbox.disabledClicked.connect(self.locate_tool)
+                else:
+                    checkbox.setEnabled(False)
+                checkbox.setChecked(False)
+                checkbox.setToolTip(f"{tool_name} not found. Click to locate executable.")
+                checkbox.setCursor(Qt.CursorShape.PointingHandCursor)
+                # Update label to show unavailable
+                current_text = checkbox.text()
+                if "(Not Found)" not in current_text:
+                    checkbox.setText(f"{current_text} (Not Found)")
+            else:
+                # Tool found - add description tooltip
+                if description:
+                    path_info = f"\nLocation: {self.available_tools.get(util_name)}" if util_name and self.available_tools.get(util_name) else ""
+                    checkbox.setToolTip(f"{description}{path_info}")
+    
+    def locate_tool(self, tool_name: str, util_name: str):
+        """Allow user to locate a tool executable manually"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            f"Locate {tool_name} Executable",
+            "",
+            "Executable Files (*.exe);;All Files (*)" if os.name == 'nt' else "All Files (*)"
+        )
+        
+        if file_path:
+            # Verify it's an executable
+            if os.path.isfile(file_path):
+                # Update available tools
+                self.available_tools[util_name] = file_path
+                
+                # Find the checkbox and re-enable it
+                checkbox = None
+                for name, cb in {**self.static_tools, **self.dynamic_tools}.items():
+                    if name == tool_name:
+                        checkbox = cb
+                        break
+                
+                if checkbox:
+                    # Remove "(Not Found)" from text
+                    current_text = checkbox.text().replace(" (Not Found)", "")
+                    checkbox.setText(current_text)
+                    
+                    if isinstance(checkbox, ClickableCheckBox):
+                        checkbox.setToolDisabled(False)
+                    else:
+                        checkbox.setEnabled(True)
+                    
+                    checkbox.setCursor(Qt.CursorShape.ArrowCursor)
+                    
+                    # Update tooltip with description and path
+                    descriptions = self.get_tool_descriptions()
+                    description = descriptions.get(tool_name, "")
+                    checkbox.setToolTip(f"{description}\nLocation: {file_path}")
+                    
+                self.show_message("Success", f"{tool_name} located successfully!", QMessageBox.Icon.Information)
+            else:
+                self.show_message("Error", "Selected file is not valid.", QMessageBox.Icon.Warning)
+    
     def toggle_all_tools(self, state, tool_dict):
         for tool in tool_dict.values():
-            tool.setChecked(state == 2)  # 2 represents Qt.Checked
+            # Only toggle enabled tools
+            if tool.isEnabled():
+                tool.setChecked(state == 2)  # 2 represents Qt.Checked
 
     def handle_procmon_ttd_exclusion(self, state, source):
         """Ensure Procmon and TTD cannot be enabled at the same time"""

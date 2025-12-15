@@ -1,12 +1,12 @@
 {
   "static_tools": {
-    "Capa": true,
-    "Yara": true,
-    "Exiftool": true,
-    "Detect-it-Easy": true,
-    "Floss": true,
-    "ResourceExtract": true,
-    "Binwalk": true
+    "Capa": false,
+    "Yara": false,
+    "Exiftool": false,
+    "Detect-it-Easy": false,
+    "Floss": false,
+    "ResourceExtract": false,
+    "Binwalk": false
   },
   "dynamic_tools": {
     "Fakenet": false,
